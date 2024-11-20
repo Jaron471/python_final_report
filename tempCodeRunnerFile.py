@@ -1,1 +1,1 @@
-numpy
+cv2
