@@ -5,9 +5,9 @@ import time
 import math
 
 # 初始化 mediapipe 的模組
-mp_drawing = mp.solutions.drawing_utils          # Mediapipe 繪圖方法
-mp_drawing_styles = mp.solutions.drawing_styles  # Mediapipe 繪圖樣式
-mp_pose = mp.solutions.pose                      # Mediapipe 姿勢偵測
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+mp_pose = mp.solutions.pose
 
 # 初始化攝影機
 cap = cv2.VideoCapture(0)
@@ -18,18 +18,21 @@ keyboard = Controller()
 last_action_time = time.time()  # 最後一次動作的時間
 current_action = None           # 用於追蹤當前的動作狀態
 
-# 用於計算腳部移動速度
-previous_right_ankle_y = None
-previous_left_ankle_y = None
-speed_threshold = 0.02  # 定義一個速度閾值，用於識別快速移動
+# 輕踢和重踢的高度閾值
+light_kick_threshold = 0.05  # 左腳輕踢的高度閾值
+heavy_kick_threshold = 0.05  # 右腳重踢的高度閾值
+speed_threshold = 0.02      # 抬高速度閾值
 
-# 用於計算身體旋轉
-previous_orientation = None
+# 回旋的設定
 rotation_threshold = 15  # 旋轉角度閾值（度）
 rotation_cooldown = 1.0  # 旋轉動作之間的最小間隔時間（秒）
+previous_orientation = None  # 前一幀的身體朝向角度
+
+# 用於追蹤膝蓋位置
+previous_left_knee_y = None
+previous_right_knee_y = None
 
 def calculate_orientation(landmarks):
-    # 使用左肩和右肩計算身體的朝向角度
     left_shoulder = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value]
     right_shoulder = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value]
     delta_x = right_shoulder.x - left_shoulder.x
@@ -51,104 +54,91 @@ with mp_pose.Pose(
         if not ret:
             print("無法接收影像幀")
             break
-        img = cv2.resize(img, (640, 480))               # 調整尺寸至更高解析度，增加辨識準確性
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # 將 BGR 轉換成 RGB
-        results = pose.process(img_rgb)                 # 取得姿勢偵測結果
+        img = cv2.resize(img, (640, 480))
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        results = pose.process(img_rgb)
 
         current_time = time.time()
 
         if results.pose_landmarks:
-            # 取得腳和肩的位置
             landmarks = results.pose_landmarks.landmark
-            right_knee = landmarks[mp_pose.PoseLandmark.RIGHT_KNEE]
+            left_hip = landmarks[mp_pose.PoseLandmark.LEFT_HIP]
+            right_hip = landmarks[mp_pose.PoseLandmark.RIGHT_HIP]
             left_knee = landmarks[mp_pose.PoseLandmark.LEFT_KNEE]
-            right_ankle = landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE]
-            left_ankle = landmarks[mp_pose.PoseLandmark.LEFT_ANKLE]
-            right_heel = landmarks[mp_pose.PoseLandmark.RIGHT_HEEL]
-            left_heel = landmarks[mp_pose.PoseLandmark.LEFT_HEEL]
-            left_shoulder = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER]
-            right_shoulder = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER]
+            right_knee = landmarks[mp_pose.PoseLandmark.RIGHT_KNEE]
 
-            # 初始化先前的腳部位置
-            if previous_right_ankle_y is None:
-                previous_right_ankle_y = right_ankle.y
-            if previous_left_ankle_y is None:
-                previous_left_ankle_y = left_ankle.y
+            # 計算膝蓋的相對高度
+            left_knee_raise = left_hip.y - left_knee.y
+            right_knee_raise = right_hip.y - right_knee.y
 
-            # 計算腳部移動速度
-            right_speed = previous_right_ankle_y - right_ankle.y
-            left_speed = previous_left_ankle_y - left_ankle.y
+            # 計算膝蓋的速度
+            if previous_left_knee_y is not None:
+                left_knee_speed = previous_left_knee_y - left_knee.y
+            else:
+                left_knee_speed = 0
 
-            # 更新先前的位置
-            previous_right_ankle_y = right_ankle.y
-            previous_left_ankle_y = left_ankle.y
+            if previous_right_knee_y is not None:
+                right_knee_speed = previous_right_knee_y - right_knee.y
+            else:
+                right_knee_speed = 0
 
-            # 新增的踢腿判斷
-            # 輕踢：當右腳踝或腳跟高於右膝，且移動速度超過閾值
-            if ((right_ankle.y < right_knee.y - 0.02) or (right_heel.y < right_knee.y - 0.02)) and right_speed > speed_threshold:
-                if current_action is None and (current_time - last_action_time) > 0.3:
-                    keyboard.press('z')  # 輕踢
+            previous_left_knee_y = left_knee.y
+            previous_right_knee_y = right_knee.y
+
+            # 左腳輕踢判斷
+            if left_knee_raise > light_kick_threshold and left_knee_speed > speed_threshold:
+                if current_action != "Left Light Kick" and (current_time - last_action_time) > 0.2:
+                    keyboard.press('z')  # 左腳輕踢
                     time.sleep(0.05)
                     keyboard.release('z')
-                    print("Light Kick")
-                    current_action = "Light Kick"
+                    print("Left Light Kick")
+                    current_action = "Left Light Kick"
                     last_action_time = current_time
-                    # 在畫面上顯示動作
-                    cv2.putText(img, "Light Kick", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-            # 重踢：當左腳踝或腳跟高於左膝，且移動速度超過閾值
-            elif ((left_ankle.y < left_knee.y - 0.02) or (left_heel.y < left_knee.y - 0.02)) and left_speed > speed_threshold:
-                if current_action is None and (current_time - last_action_time) > 0.3:
-                    keyboard.press('c')  # 重踢
+                    cv2.putText(img, "Left Light Kick", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+
+            # 右腳重踢判斷
+            if right_knee_raise > heavy_kick_threshold and right_knee_speed > speed_threshold:
+                if current_action != "Right Heavy Kick" and (current_time - last_action_time) > 0.2:
+                    keyboard.press('c')  # 右腳重踢
                     time.sleep(0.05)
                     keyboard.release('c')
-                    print("Heavy Kick")
-                    current_action = "Heavy Kick"
+                    print("Right Heavy Kick")
+                    current_action = "Right Heavy Kick"
                     last_action_time = current_time
-                    # 在畫面上顯示動作
-                    cv2.putText(img, "Heavy Kick", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-            else:
-                # 當踢腿動作結束，重置動作狀態
-                if current_action is not None and (current_time - last_action_time) > 0.3:
-                    current_action = None
+                    cv2.putText(img, "Right Heavy Kick", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
 
-            # 新增的迴旋提判斷
-            # 計算當前的身體朝向角度
+            # 回旋判斷
             current_orientation = calculate_orientation(landmarks)
-
             if previous_orientation is not None:
-                # 計算角度差
                 angle_diff = current_orientation - previous_orientation
-
-                # 調整角度差範圍到 [-180, 180]
                 if angle_diff > 180:
                     angle_diff -= 360
                 elif angle_diff < -180:
                     angle_diff += 360
 
-                # 檢查是否達到旋轉閾值
                 if abs(angle_diff) > rotation_threshold:
-                    # 檢查冷卻時間
                     if (current_time - last_action_time) > rotation_cooldown:
-                        # 同時按下 'z' 和 'c' 鍵
                         keyboard.press('z')
                         keyboard.press('c')
                         time.sleep(0.05)
                         keyboard.release('z')
                         keyboard.release('c')
                         if angle_diff > 0:
-                            # 向右旋轉
                             print("Spin Right")
-                            cv2.putText(img, "Spin Right", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
+                            cv2.putText(img, "Spin Right", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
                         else:
-                            # 向左旋轉
                             print("Spin Left")
-                            cv2.putText(img, "Spin Left", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
+                            cv2.putText(img, "Spin Left", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
                         current_action = "Spin"
                         last_action_time = current_time
-            # 更新先前的朝向
+
             previous_orientation = current_orientation
 
-            # 根據姿勢偵測結果，標記身體節點和骨架
+            # 重置動作
+            if current_action is not None and (current_time - last_action_time) > 0.3:
+                current_action = None
+
+            # 標記身體節點和骨架
             mp_drawing.draw_landmarks(
                 img,
                 results.pose_landmarks,
@@ -158,8 +148,7 @@ with mp_pose.Pose(
         # 顯示影像
         cv2.imshow('Pose Detection', img)
         if cv2.waitKey(1) & 0xFF == ord('q'):
-            break     # 按下 q 鍵停止
+            break
 
-# 釋放資源
 cap.release()
 cv2.destroyAllWindows()
