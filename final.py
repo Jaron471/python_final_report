@@ -125,10 +125,12 @@ with mp_pose.Pose(
                 if direction == "right":
                     print("Move right")
                     keyboard.press(Key.right)
+                    time.sleep(0.15)  # 短暫延遲確保按鍵被偵測
                     keyboard.release(Key.right)
                 elif direction == "left":
                     print("Move left")
                     keyboard.press(Key.left)
+                    time.sleep(0.15)  # 短暫延遲確保按鍵被偵測
                     keyboard.release(Key.left)
                 last_action_time = current_time
                 action_triggered = True
@@ -141,6 +143,7 @@ with mp_pose.Pose(
                     keyboard.press('a')  
                     keyboard.press('d')
                     keyboard.press(Key.down)
+                    time.sleep(0.05)  # 短暫延遲，確保所有按鍵被識別
                     keyboard.release('a')
                     keyboard.release('d')
                     keyboard.release(Key.down)  
@@ -148,38 +151,45 @@ with mp_pose.Pose(
                     last_action_time = current_time
                     action_triggered = True
                     cv2.putText(img, "Shoryuken", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                    time.sleep(0.1)
             
             # 氣力射出：當左手高於左肩的 y 軸位置
             elif left_wrist.y < left_shoulder.y and not action_triggered:
                 if (current_time - last_action_time) > ACTION_COOLDOWN:
                     keyboard.press('a')  
                     keyboard.press('d')
+                    time.sleep(0.05)  # 短暫延遲，確保所有按鍵被識別
                     keyboard.release('a')
                     keyboard.release('d')
                     print("Ki Blast")
                     last_action_time = current_time
                     action_triggered = True
+                    time.sleep(0.1)
                     cv2.putText(img, "Ki Blast", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
             
             # 輕拳：當右手位置在右肩前方
             elif right_wrist.x < right_shoulder.x - 0.1 and not action_triggered:
                 if (current_time - last_action_time) > ACTION_COOLDOWN:
                     keyboard.press('a')
+                    time.sleep(0.05)
                     keyboard.release('a')
                     print("Light Punch")
                     last_action_time = current_time
                     action_triggered = True
                     cv2.putText(img, "Light Punch", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-            
+                    time.sleep(0.1)
+
             # 重拳：當左手位置在左肩前方
             elif left_wrist.x > left_shoulder.x + 0.1 and not action_triggered:
                 if (current_time - last_action_time) > ACTION_COOLDOWN:
                     keyboard.press('d')
+                    time.sleep(0.05)
                     keyboard.release('d')
                     print("Heavy Punch")
                     last_action_time = current_time
                     action_triggered = True
                     cv2.putText(img, "Heavy Punch", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
+                    time.sleep(0.1)
             
             # ------------------ Leg/Kick Detection Module ------------------
             # 計算膝蓋的相對高度
@@ -204,6 +214,7 @@ with mp_pose.Pose(
             if left_knee_raise > light_kick_threshold and left_knee_speed > speed_threshold and not action_triggered:
                 if (current_time - last_action_time) > ACTION_COOLDOWN:
                     keyboard.press('z')  # 左腳輕踢
+                    time.sleep(0.05)
                     keyboard.release('z')
                     print("Left Light Kick")
                     last_action_time = current_time
@@ -214,6 +225,7 @@ with mp_pose.Pose(
             if right_knee_raise > heavy_kick_threshold and right_knee_speed > speed_threshold and not action_triggered:
                 if (current_time - last_action_time) > ACTION_COOLDOWN:
                     keyboard.press('c')  # 右腳重踢
+                    time.sleep(0.05)
                     keyboard.release('c')
                     print("Right Heavy Kick")
                     last_action_time = current_time
@@ -235,6 +247,7 @@ with mp_pose.Pose(
                         # Spin Right
                         keyboard.press('z')
                         keyboard.press('c')
+                        time.sleep(0.05)
                         keyboard.release('z')
                         keyboard.release('c')
                         print("Spin Right")
@@ -243,6 +256,7 @@ with mp_pose.Pose(
                         # Spin Left
                         keyboard.press('z')
                         keyboard.press('c')
+                        time.sleep(0.05)
                         keyboard.release('z')
                         keyboard.release('c')
                         print("Spin Left")
