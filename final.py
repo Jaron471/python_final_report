@@ -138,8 +138,8 @@ with mp_pose.Pose(
             # ------------------ Hand Gesture Module ------------------
             # 優先處理特殊動作
             # 昇龍拳：當右手高於右肩的 y 軸位置
-            if right_wrist.y < right_shoulder.y - 0.05 and not action_triggered:
-                if (current_time - last_action_time) > ACTION_COOLDOWN:
+            if right_wrist.y < right_shoulder.y - 0.05:  # 增加容錯，減少微小抖動影響
+                if current_action == None and (current_time - last_action_time) > 0.5:
                     keyboard.press('a')  
                     keyboard.press('d')
                     keyboard.press(Key.down)
@@ -148,48 +148,47 @@ with mp_pose.Pose(
                     keyboard.release('d')
                     keyboard.release(Key.down)  
                     print("Shoryuken")
+                    current_action = "Shoryuken"
                     last_action_time = current_time
-                    action_triggered = True
-                    cv2.putText(img, "Shoryuken", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                     time.sleep(0.1)
             
             # 氣力射出：當左手高於左肩的 y 軸位置
-            elif left_wrist.y < left_shoulder.y and not action_triggered:
-                if (current_time - last_action_time) > ACTION_COOLDOWN:
+            elif left_wrist.y < left_shoulder.y:
+                if current_action == None and (current_time - last_action_time) > 0.5:
                     keyboard.press('a')  
                     keyboard.press('d')
                     time.sleep(0.05)  # 短暫延遲，確保所有按鍵被識別
                     keyboard.release('a')
                     keyboard.release('d')
                     print("Ki Blast")
+                    current_action = "Ki Blast"
                     last_action_time = current_time
-                    action_triggered = True
                     time.sleep(0.1)
-                    cv2.putText(img, "Ki Blast", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
             
             # 輕拳：當右手位置在右肩前方
-            elif right_wrist.x < right_shoulder.x - 0.1 and not action_triggered:
-                if (current_time - last_action_time) > ACTION_COOLDOWN:
+            elif right_wrist.x < right_shoulder.x - 0.1:
+                if current_action == None and (current_time - last_action_time) > 0.5:
                     keyboard.press('a')
                     time.sleep(0.05)
                     keyboard.release('a')
                     print("Light Punch")
+                    current_action = "Light Punch"
                     last_action_time = current_time
-                    action_triggered = True
-                    cv2.putText(img, "Light Punch", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                     time.sleep(0.1)
 
             # 重拳：當左手位置在左肩前方
-            elif left_wrist.x > left_shoulder.x + 0.1 and not action_triggered:
-                if (current_time - last_action_time) > ACTION_COOLDOWN:
+            elif left_wrist.x > left_shoulder.x + 0.1:
+                if current_action == None and (current_time - last_action_time) > 0.5:
                     keyboard.press('d')
                     time.sleep(0.05)
                     keyboard.release('d')
                     print("Heavy Punch")
+                    current_action = "Heavy Punch"
                     last_action_time = current_time
-                    action_triggered = True
-                    cv2.putText(img, "Heavy Punch", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                     time.sleep(0.1)
+
+            elif current_action != None:
+                current_action = None
             
             # ------------------ Leg/Kick Detection Module ------------------
             # 計算膝蓋的相對高度
